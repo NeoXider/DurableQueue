@@ -1,0 +1,20 @@
+{
+  "name": "com.neoxider.durablequeue",
+  "version": "0.3.0",
+  "displayName": "Neoxider Durable Queue",
+  "description": "Durable outbox for unreliable networks: records survive a restart, keep FIFO inside a stream, retry with exponential backoff and full jitter, and end up in a capped dead-letter instead of disappearing. Storage, transport, retry policy, codec, clock and log are ports, so the library knows nothing about a concrete HTTP API, engine storage or host domain. Ships two lanes over one policy: durable (fire-and-forget, survives restart) and immediate (the caller gets the answer or a visible error).",
+  "unity": "6000.0",
+  "author": {
+    "name": "Neoxider"
+  },
+  "license": "MIT",
+  "hideInEditor": false,
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NeoXider/DurableQueue.git"
+  }
+}

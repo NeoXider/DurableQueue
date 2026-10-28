@@ -1,8 +1,34 @@
-# Neoxider Durable Queue
+<p align="center">
+  <img src="Docs~/Images/readme/01_hero.svg" alt="Neoxider Durable Queue: записи из хранилища идут потоками к получателю, повторяются с бэкоффом и попадают в dead-letter вместо тихой потери" width="100%">
+</p>
 
-Очередь исходящих запросов, которая переживает перезапуск.
+# <img src="Docs~/Images/icon.svg" alt="Иконка Durable Queue" width="40" height="40" align="absmiddle"> Neoxider Durable Queue
 
-Задача у неё одна и не про конкретный проект: **отправить на сервер, пережить закрытие приложения,
+**Очередь исходящих запросов, которая переживает перезапуск.** Отправить на сервер, пережить закрытие
+приложения, повторить с бэкоффом, не применить дважды и не потерять молча — работа любого клиента с
+ненадёжной сетью, вынесенная в отдельную библиотеку.
+
+[![Unity](https://img.shields.io/badge/Unity-6000.0%2B-black)](https://unity.com/releases/editor)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-5ee05a)](CHANGELOG.md)
+
+<sub>
+<a href="#зачем">Зачем</a>&nbsp;&nbsp;•&nbsp;
+<a href="#возможности">Возможности</a>&nbsp;&nbsp;•&nbsp;
+<a href="#две-полосы-поверх-одной-политики">Две полосы</a>&nbsp;&nbsp;•&nbsp;
+<a href="#установка">Установка</a>&nbsp;&nbsp;•&nbsp;
+<a href="#быстрый-старт">Быстрый старт</a>&nbsp;&nbsp;•&nbsp;
+<a href="#два-класса-записей">Классы записей</a>&nbsp;&nbsp;•&nbsp;
+<a href="#что-стоит-знать-до-первого-использования">Что знать</a>&nbsp;&nbsp;•&nbsp;
+<a href="#чего-библиотека-не-делает">Чего не делает</a>&nbsp;&nbsp;•&nbsp;
+<a href="#лицензия">Лицензия</a>
+</sub>
+
+---
+
+## Зачем
+
+Задача у очереди одна и не про конкретный проект: **отправить на сервер, пережить закрытие приложения,
 повторить с бэкоффом, не применить дважды и не потерять молча**. Это работа любого клиента с
 ненадёжной сетью.
 
@@ -10,7 +36,31 @@
 понятий вашей предметной области. Хранилище, транспорт, политика повторов, формат, журнал и часы —
 порты. Внутрь приходит просто строковый ключ и просто полезная нагрузка.
 
+---
+
+## Возможности
+
+- **Две полосы поверх одной политики** — `ImmediateLane` (ответ или видимая ошибка в пределах вызова) и
+  `DurableLane<T>` (запись на носителе, доставка позже, переживает перезапуск).
+- **Потоки** — строгий FIFO внутри потока, независимость между потоками; `independentTargets` переносит
+  FIFO на уровень адреса.
+- **Два класса записей** — `Event` (факт, не схлопывается) и `State` (снимок, глубина потока 1).
+- **Повторы** — экспоненциальный бэкофф с полным джиттером (`QueueBackoff`), срок следующей попытки
+  лежит в самой записи; ответы сервера и обрывы связи считаются отдельно.
+- **Лимиты** (`QueueLimits`, значения по умолчанию) — мягкий бюджет очереди 256 КБ сериализованного вида,
+  запись до 32 КБ, срок жизни 7 дней, до 12 попыток (считаются только ответы сервера), приостановка
+  снимается сама через 10 минут, dead-letter помнит 20 последних неудач.
+- **Наблюдаемые потери** — вытеснение, превышение бюджета, постоянный отказ, исчерпание попыток и истечение
+  срока дают событие `Incident` и строку в dead-letter (метаданные, без нагрузки).
+- **Пачки** — `maxBatchSize` потока, частичный отказ `QueueBatch.Reject(...)` и частичное подтверждение
+  `QueueBatch.Confirm(...)`.
+- **Идемпотентность** — `idempotencyKey` при постановке; правило вывода ключа остаётся за вызывающим.
+
+---
+
 ## Две полосы поверх одной политики
+
+<p align="center"><img src="Docs~/Images/readme/02_lanes.svg" alt="Немедленная и долговечная полосы над общей политикой повторов IQueueRetryPolicy; хранилище, транспорт, диспетчер, формат, часы и журнал — порты" width="100%"></p>
 
 | | Немедленная | Долговечная |
 |---|---|---|
@@ -27,9 +77,55 @@
 применяется локально сразу, доставку гарантирует очередь, подтверждение приходит позже и меняет
 отображение, а не ход работы.
 
-## Как это выглядит из кода
+---
+
+## Установка
+
+Unity **6000.0+**. Зависимости объявлены в `package.json` явно: `com.cysharp.unitask` 2.5.0 и
+`com.unity.nuget.newtonsoft-json` 3.2.1. Newtonsoft приезжает из реестра Unity сам, а **UniTask в реестре
+Unity нет** — без него пакет не разрешится. Подключите UniTask одним из двух способов.
+
+**Вариант 1 — scoped registry OpenUPM** в `Packages/manifest.json`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": ["com.cysharp"]
+    }
+  ],
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.0",
+    "com.neoxider.durablequeue": "https://github.com/NeoXider/DurableQueue.git#v0.3.0"
+  }
+}
+```
+
+**Вариант 2 — UniTask из git**, затем сам пакет. Package Manager → *Add package from git URL*, по очереди:
+
+```text
+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.0
+https://github.com/NeoXider/DurableQueue.git#v0.3.0
+```
+
+или в `Packages/manifest.json`:
+
+```json
+"com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.0",
+"com.neoxider.durablequeue": "https://github.com/NeoXider/DurableQueue.git#v0.3.0"
+```
+
+---
+
+## Быстрый старт
 
 ```csharp
+using Neoxider.DurableQueue;
+using Neoxider.DurableQueue.Lanes;
+using Neoxider.DurableQueue.Ports;
+
 DurableLane<LevelResult> queue = new(
     storage,                       // ваш IQueueStorage: префы, файл, база браузера
     dispatcher,                    // ваш IQueueDispatcher: типизированный клиент или транспорт
@@ -56,6 +152,26 @@ QueueResponse answer = await immediate.SendAsync(new QueueRequest("GET", url));
 // исчерпание повторов и постоянный отказ прилетают QueueRequestFailedException, а не пустотой
 ```
 
+Политика — единственное место, где живут коды вашего сервера. Набросок (коды условные):
+
+```csharp
+sealed class MyServerPolicy : IQueueRetryPolicy
+{
+    public QueueRetryDecision Decide(QueueAttempt attempt)
+    {
+        QueueResponse response = attempt.Response;
+        if (response.TransportFailure) return QueueRetryDecision.RetryLater(reason: "offline");
+        if (response.StatusCode is >= 200 and < 300) return QueueRetryDecision.Done();
+        if (response.StatusCode == 401) return QueueRetryDecision.Suspend("auth");
+        if (response.StatusCode == 429 || response.StatusCode >= 500)
+            return QueueRetryDecision.RetryLater(reason: "server busy");
+        return QueueRetryDecision.Drop($"rejected with {response.StatusCode}");
+    }
+}
+```
+
+---
+
 ## Два класса записей
 
 - **`Event`** — факт, который случился один раз: строгий FIFO внутри потока, снимается только по
@@ -65,6 +181,8 @@ QueueResponse answer = await immediate.SendAsync(new QueueRequest("GET", url));
 
 Без этого различия очередь либо раздувается (каждое промежуточное значение — отдельная запись), либо
 теряет факты (схлопывание там, где схлопывать нельзя).
+
+---
 
 ## Что стоит знать до первого использования
 
@@ -95,6 +213,8 @@ QueueResponse answer = await immediate.SendAsync(new QueueRequest("GET", url));
 - **Потери наблюдаемы.** Вытеснение, превышение бюджета, постоянный отказ, исчерпание попыток и
   истечение срока — событие `Incident` и строка в dead-letter (метаданные, без нагрузки).
 
+---
+
 ## Чего библиотека НЕ делает
 
 Граница ответственности честнее списка возможностей.
@@ -114,26 +234,22 @@ QueueResponse answer = await immediate.SendAsync(new QueueRequest("GET", url));
 - **Не считает идентификаторы идемпотентности.** Правило их вывода предметное: у факта одно, у
   снимка другое, и внутрь библиотеки оно не попадает.
 
-## Зависимости
+---
 
-`com.cysharp.unitask` и `com.unity.nuget.newtonsoft-json` — обе объявлены в `package.json` явно.
-UniTask в проекте-хозяине приезжает из git/OpenUPM, Newtonsoft — из реестра Unity; в чужом проекте
-их наличие не подразумевается.
+## Документация
 
-## Установка
+| Что | Где |
+|---|---|
+| История версий | [CHANGELOG.md](CHANGELOG.md) |
+| Порты: хранилище, транспорт, диспетчер, политика, формат, часы, журнал | [`Runtime/Ports`](Runtime/Ports) |
+| Полосы и их опции | [`Runtime/Lanes`](Runtime/Lanes) |
+| Поведение, закреплённое тестами | [`Tests`](Tests) |
 
-Unity 6000.0+. Package Manager → *Add package from git URL*:
-
-```text
-https://github.com/NeoXider/DurableQueue.git#v0.3.0
-```
-
-или в `Packages/manifest.json`:
-
-```json
-"com.neoxider.durablequeue": "https://github.com/NeoXider/DurableQueue.git#v0.3.0"
-```
+---
 
 ## Лицензия
 
 [MIT](LICENSE.md), © 2026 Neoxider.
+
+**Автор:** [Neoxider](https://github.com/NeoXider) · **Вопросы и ошибки:**
+[GitHub Issues](https://github.com/NeoXider/DurableQueue/issues)

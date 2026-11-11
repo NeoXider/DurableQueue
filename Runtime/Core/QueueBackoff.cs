@@ -29,19 +29,21 @@ namespace Neoxider.DurableQueue
         public TimeSpan Cap { get; }
 
         /// <summary>Верхняя граница окна для <paramref name="failures"/> уже случившихся неудач.</summary>
-        public TimeSpan Ceiling(int failures)
-        {
-            if (failures <= 0)
-            {
-                return BaseDelay;
-            }
+        public TimeSpan Ceiling(int failures) => CeilingOf(BaseDelay, Cap, failures);
 
+        /// <summary>
+        /// То же окно без экземпляра и без случайности: <c>min(baseDelay * 2^failures, cap)</c>. Для
+        /// потребителя, которому нужна сама формула роста — например, повтор заявки, которую ждёт
+        /// один игрок, где размазывать залп некому.
+        /// </summary>
+        public static TimeSpan CeilingOf(TimeSpan baseDelay, TimeSpan cap, int failures)
+        {
             // Показатель ограничен до умножения: 2^n при n порядка сотни переполняет double и
             // превращает задержку в бесконечность, а очередь — в замолчавшую навсегда.
-            int exponent = Math.Min(failures, 30);
-            double milliseconds = BaseDelay.TotalMilliseconds * Math.Pow(2, exponent);
-            return milliseconds >= Cap.TotalMilliseconds
-                ? Cap
+            int exponent = Math.Clamp(failures, 0, 30);
+            double milliseconds = baseDelay.TotalMilliseconds * Math.Pow(2, exponent);
+            return milliseconds >= cap.TotalMilliseconds
+                ? cap
                 : TimeSpan.FromMilliseconds(milliseconds);
         }
 

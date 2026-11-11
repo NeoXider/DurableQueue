@@ -283,6 +283,21 @@ namespace Neoxider.DurableQueue.Tests
             Assert.AreEqual(backoff.Cap, backoff.Next(50), "окно упирается в потолок и не растёт дальше");
         }
 
+        [Test]
+        public void CeilingOf_IsTheWindowFormula_WithoutAnInstance()
+        {
+            TimeSpan baseDelay = TimeSpan.FromSeconds(1);
+            TimeSpan cap = TimeSpan.FromSeconds(8);
+
+            Assert.AreEqual(TimeSpan.FromSeconds(1), QueueBackoff.CeilingOf(baseDelay, cap, 0));
+            Assert.AreEqual(TimeSpan.FromSeconds(2), QueueBackoff.CeilingOf(baseDelay, cap, 1));
+            Assert.AreEqual(TimeSpan.FromSeconds(4), QueueBackoff.CeilingOf(baseDelay, cap, 2));
+            Assert.AreEqual(cap, QueueBackoff.CeilingOf(baseDelay, cap, 3));
+            Assert.AreEqual(cap, QueueBackoff.CeilingOf(baseDelay, cap, 500), "большой счёт не переполняет окно");
+            Assert.AreEqual(cap, QueueBackoff.CeilingOf(TimeSpan.FromSeconds(20), cap, 0), "потолок держит и базу");
+            Assert.AreEqual(new QueueBackoff(baseDelay, cap).Ceiling(2), QueueBackoff.CeilingOf(baseDelay, cap, 2));
+        }
+
         /// <summary>
         /// Момент следующей попытки лежит В ЗАПИСИ. Иначе перезапуск сбрасывает бэкофф в ноль, и
         /// очередь, накопившаяся за офлайн, уходит на сервер штормом ровно в момент старта.
